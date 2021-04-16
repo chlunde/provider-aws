@@ -69,15 +69,19 @@ func specPermissions() []v1beta1.IPPermission {
 	}
 }
 
-func sgPersmissions() []awsec2.IpPermission {
+func sgPersmissions(port int64, cidrs ...string) []awsec2.IpPermission {
+	ranges := make([]awsec2.IpRange, 0, len(cidrs))
+	for _, cidr := range cidrs {
+		ranges = append(ranges, awsec2.IpRange{
+			CidrIp: aws.String(cidr),
+		})
+	}
 	return []awsec2.IpPermission{
 		{
-			FromPort:   aws.Int64(port100),
-			ToPort:     aws.Int64(port100),
+			FromPort:   aws.Int64(port),
+			ToPort:     aws.Int64(port),
 			IpProtocol: aws.String(tcpProtocol),
-			IpRanges: []awsec2.IpRange{{
-				CidrIp: aws.String(cidr),
-			}},
+			IpRanges:   ranges,
 		},
 	}
 }
@@ -337,8 +341,8 @@ func TestUpdate(t *testing.T) {
 						return awsec2.DescribeSecurityGroupsRequest{
 							Request: &aws.Request{HTTPRequest: &http.Request{}, Retryer: aws.NoOpRetryer{}, Data: &awsec2.DescribeSecurityGroupsOutput{
 								SecurityGroups: []awsec2.SecurityGroup{{
-									IpPermissions:       sgPersmissions(),
-									IpPermissionsEgress: sgPersmissions(),
+									IpPermissions:       sgPersmissions(port100, cidr),
+									IpPermissionsEgress: sgPersmissions(port100, cidr),
 								}},
 							}},
 						}
@@ -389,8 +393,8 @@ func TestUpdate(t *testing.T) {
 						return awsec2.DescribeSecurityGroupsRequest{
 							Request: &aws.Request{HTTPRequest: &http.Request{}, Retryer: aws.NoOpRetryer{}, Data: &awsec2.DescribeSecurityGroupsOutput{
 								SecurityGroups: []awsec2.SecurityGroup{{
-									IpPermissions:       sgPersmissions(),
-									IpPermissionsEgress: sgPersmissions(),
+									IpPermissions:       sgPersmissions(port100, cidr),
+									IpPermissionsEgress: sgPersmissions(port100, cidr),
 								}},
 							}},
 						}
@@ -439,87 +443,6 @@ func TestUpdate(t *testing.T) {
 				t.Errorf("r: -want, +got:\n%s", diff)
 			}
 			if diff := cmp.Diff(tc.want.result, o); diff != "" {
-				t.Errorf("r: -want, +got:\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestDelete(t *testing.T) {
-	type want struct {
-		cr  *v1beta1.SecurityGroup
-		err error
-	}
-
-	cases := map[string]struct {
-		args
-		want
-	}{
-		"Successful": {
-			args: args{
-				sg: &fake.MockSecurityGroupClient{
-					MockDelete: func(input *awsec2.DeleteSecurityGroupInput) awsec2.DeleteSecurityGroupRequest {
-						return awsec2.DeleteSecurityGroupRequest{
-							Request: &aws.Request{HTTPRequest: &http.Request{}, Retryer: aws.NoOpRetryer{}, Data: &awsec2.DeleteSecurityGroupOutput{}},
-						}
-					},
-				},
-				cr: sg(withStatus(v1beta1.SecurityGroupObservation{
-					SecurityGroupID: sgID,
-				})),
-			},
-			want: want{
-				cr: sg(withStatus(v1beta1.SecurityGroupObservation{
-					SecurityGroupID: sgID,
-				}), withConditions(xpv1.Deleting())),
-			},
-		},
-		"InvalidSgId": {
-			args: args{
-				sg: &fake.MockSecurityGroupClient{
-					MockDelete: func(input *awsec2.DeleteSecurityGroupInput) awsec2.DeleteSecurityGroupRequest {
-						return awsec2.DeleteSecurityGroupRequest{
-							Request: &aws.Request{HTTPRequest: &http.Request{}, Retryer: aws.NoOpRetryer{}, Data: &awsec2.DeleteSecurityGroupOutput{}},
-						}
-					},
-				},
-				cr: sg(),
-			},
-			want: want{
-				cr: sg(withConditions(xpv1.Deleting())),
-			},
-		},
-		"DeleteFailure": {
-			args: args{
-				sg: &fake.MockSecurityGroupClient{
-					MockDelete: func(input *awsec2.DeleteSecurityGroupInput) awsec2.DeleteSecurityGroupRequest {
-						return awsec2.DeleteSecurityGroupRequest{
-							Request: &aws.Request{HTTPRequest: &http.Request{}, Error: errBoom},
-						}
-					},
-				},
-				cr: sg(withStatus(v1beta1.SecurityGroupObservation{
-					SecurityGroupID: sgID,
-				})),
-			},
-			want: want{
-				cr: sg(withStatus(v1beta1.SecurityGroupObservation{
-					SecurityGroupID: sgID,
-				}), withConditions(xpv1.Deleting())),
-				err: awsclient.Wrap(errBoom, errDelete),
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			e := &external{kube: tc.kube, sg: tc.sg}
-			err := e.Delete(context.Background(), tc.args.cr)
-
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("r: -want, +got:\n%s", diff)
-			}
-			if diff := cmp.Diff(tc.want.cr, tc.args.cr, test.EquateConditions()); diff != "" {
 				t.Errorf("r: -want, +got:\n%s", diff)
 			}
 		})
