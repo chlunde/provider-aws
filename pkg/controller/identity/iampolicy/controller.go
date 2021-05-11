@@ -37,6 +37,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/crossplane/provider-aws/apis/identity/v1alpha1"
+	"github.com/crossplane/provider-aws/apis/identity/v1beta1"
 	awsclient "github.com/crossplane/provider-aws/pkg/clients"
 	"github.com/crossplane/provider-aws/pkg/clients/iam"
 )
@@ -187,7 +188,38 @@ func (e *external) Update(ctx context.Context, mgd resource.Managed) (managed.Ex
 		SetAsDefault:   true,
 	})
 
-	return managed.ExternalUpdate{}, awsclient.Wrap(err, errUpdate)
+	if err != nil {
+		return managed.ExternalUpdate{}, awsclient.Wrap(err, errUpdate)
+	}
+
+	out, err := e.client.ListPolicyTags(ctx, &awsiam.ListPolicyTagsInput{PolicyArn: aws.String(meta.GetExternalName(cr))})
+	if err != nil {
+		return managed.ExternalUpdate{}, awsclient.Wrap(err, "TODO tags")
+	}
+
+	var tags []v1beta1.Tag
+	for _, t := range cr.Spec.ForProvider.Tags {
+		tags = append(tags, v1beta1.Tag(t))
+	}
+	add, remove := iam.DiffIAMTags(tags, out.Tags)
+	if len(remove) != 0 {
+		if _, err := e.client.UntagPolicy(ctx, &awsiam.UntagPolicyInput{
+			PolicyArn: aws.String(meta.GetExternalName(cr)),
+			TagKeys:   remove,
+		}); err != nil {
+			return managed.ExternalUpdate{}, awsclient.Wrap(err, "cannot untag")
+		}
+	}
+	if len(add) != 0 {
+		if _, err := e.client.TagPolicy(ctx, &awsiam.TagPolicyInput{
+			PolicyArn: aws.String(meta.GetExternalName(cr)),
+			Tags:      add,
+		}); err != nil {
+			return managed.ExternalUpdate{}, awsclient.Wrap(err, "cannot tag")
+		}
+	}
+
+	return managed.ExternalUpdate{}, nil
 }
 
 func (e *external) Delete(ctx context.Context, mgd resource.Managed) error {

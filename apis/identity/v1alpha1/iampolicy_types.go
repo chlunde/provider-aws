@@ -37,6 +37,12 @@ type IAMPolicyParameters struct {
 
 	// The name of the policy.
 	Name string `json:"name"`
+
+	// Tags. For more information about
+	// tagging, see Tagging customer managed policies (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_tags.html)
+	// in the IAM User Guide.
+	// +optional
+	Tags []Tag `json:"tags,omitempty"`
 }
 
 // An IAMPolicySpec defines the desired state of an IAMPolicy.

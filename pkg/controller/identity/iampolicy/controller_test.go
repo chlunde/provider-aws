@@ -23,6 +23,7 @@ import (
 	awsiam "github.com/aws/aws-sdk-go-v2/service/iam"
 	awsiamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 
 	"github.com/crossplane/provider-aws/apis/identity/v1alpha1"
+	aws "github.com/crossplane/provider-aws/pkg/clients"
 	awsclient "github.com/crossplane/provider-aws/pkg/clients"
 	"github.com/crossplane/provider-aws/pkg/clients/iam"
 	"github.com/crossplane/provider-aws/pkg/clients/iam/fake"
@@ -69,6 +71,12 @@ type policyModifier func(*v1alpha1.IAMPolicy)
 
 func withExterName(s string) policyModifier {
 	return func(r *v1alpha1.IAMPolicy) { meta.SetExternalName(r, s) }
+}
+
+func withTag(k, v string) policyModifier {
+	return func(r *v1alpha1.IAMPolicy) {
+		r.Spec.ForProvider.Tags = append(r.Spec.ForProvider.Tags, v1alpha1.Tag{Key: k, Value: v})
+	}
 }
 
 func withConditions(c ...xpv1.Condition) policyModifier {
@@ -311,6 +319,9 @@ func TestUpdate(t *testing.T) {
 					MockCreatePolicyVersion: func(ctx context.Context, input *awsiam.CreatePolicyVersionInput, opts []func(*awsiam.Options)) (*awsiam.CreatePolicyVersionOutput, error) {
 						return &awsiam.CreatePolicyVersionOutput{}, nil
 					},
+					MockListPolicyTags: func(ctx context.Context, input *awsiam.ListPolicyTagsInput, opts []func(*awsiam.Options)) (*awsiam.ListPolicyTagsOutput, error) {
+						return &awsiam.ListPolicyTagsOutput{}, nil
+					},
 				},
 				cr: policy(withExterName(arn)),
 			},
@@ -361,6 +372,163 @@ func TestUpdate(t *testing.T) {
 				err: awsclient.Wrap(errBoom, errUpdate),
 			},
 		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := &external{client: tc.iam}
+			o, err := e.Update(context.Background(), tc.args.cr)
+
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("r: -want, +got:\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.want.cr, tc.args.cr, test.EquateConditions()); diff != "" {
+				t.Errorf("r: -want, +got:\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.want.result, o); diff != "" {
+				t.Errorf("r: -want, +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUpdateTags(t *testing.T) {
+
+	type want struct {
+		cr     resource.Managed
+		result managed.ExternalUpdate
+		err    error
+	}
+
+	cases := map[string]struct {
+		args
+		want
+	}{
+		"SuccessfulUntag": {
+			args: args{
+				iam: &fake.MockPolicyClient{
+					MockListPolicyVersions: func(ctx context.Context, input *awsiam.ListPolicyVersionsInput, opts []func(*awsiam.Options)) (*awsiam.ListPolicyVersionsOutput, error) {
+						return &awsiam.ListPolicyVersionsOutput{}, nil
+					},
+					MockDeletePolicyVersion: func(ctx context.Context, input *awsiam.DeletePolicyVersionInput, opts []func(*awsiam.Options)) (*awsiam.DeletePolicyVersionOutput, error) {
+						return &awsiam.DeletePolicyVersionOutput{}, nil
+					},
+					MockCreatePolicyVersion: func(ctx context.Context, input *awsiam.CreatePolicyVersionInput, opts []func(*awsiam.Options)) (*awsiam.CreatePolicyVersionOutput, error) {
+						return &awsiam.CreatePolicyVersionOutput{}, nil
+					},
+					MockListPolicyTags: func(ctx context.Context, input *awsiam.ListPolicyTagsInput, opts []func(*awsiam.Options)) (*awsiam.ListPolicyTagsOutput, error) {
+						return &awsiam.ListPolicyTagsOutput{
+							Tags: []awsiamtypes.Tag{
+								{
+									Key:   aws.String("k1"),
+									Value: aws.String("v1"),
+								},
+							},
+						}, nil
+					},
+					MockUntagPolicy: func(ctx context.Context, input *awsiam.UntagPolicyInput, opts []func(*awsiam.Options)) (*awsiam.UntagPolicyOutput, error) {
+						if len(input.TagKeys) != 1 || input.TagKeys[0] != "k1" {
+							t.Errorf("expected delete of tag k1")
+						}
+						return &awsiam.UntagPolicyOutput{}, nil
+					},
+				},
+				cr: policy(withExterName(arn)),
+			},
+			want: want{
+				cr: policy(withExterName(arn)),
+			},
+		},
+		"SuccessfulRetag": {
+			args: args{
+				iam: &fake.MockPolicyClient{
+					MockListPolicyVersions: func(ctx context.Context, input *awsiam.ListPolicyVersionsInput, opts []func(*awsiam.Options)) (*awsiam.ListPolicyVersionsOutput, error) {
+						return &awsiam.ListPolicyVersionsOutput{}, nil
+					},
+					MockDeletePolicyVersion: func(ctx context.Context, input *awsiam.DeletePolicyVersionInput, opts []func(*awsiam.Options)) (*awsiam.DeletePolicyVersionOutput, error) {
+						return &awsiam.DeletePolicyVersionOutput{}, nil
+					},
+					MockCreatePolicyVersion: func(ctx context.Context, input *awsiam.CreatePolicyVersionInput, opts []func(*awsiam.Options)) (*awsiam.CreatePolicyVersionOutput, error) {
+						return &awsiam.CreatePolicyVersionOutput{}, nil
+					},
+					MockListPolicyTags: func(ctx context.Context, input *awsiam.ListPolicyTagsInput, opts []func(*awsiam.Options)) (*awsiam.ListPolicyTagsOutput, error) {
+						return &awsiam.ListPolicyTagsOutput{
+							Tags: []awsiamtypes.Tag{
+								{
+									Key:   aws.String("k1"),
+									Value: aws.String("v1"),
+								},
+							},
+						}, nil
+					},
+					MockUntagPolicy: func(ctx context.Context, input *awsiam.UntagPolicyInput, opts []func(*awsiam.Options)) (*awsiam.UntagPolicyOutput, error) {
+						if len(input.TagKeys) != 1 || input.TagKeys[0] != "k1" {
+							t.Errorf("expected delete of tag k1")
+						}
+						return &awsiam.UntagPolicyOutput{}, nil
+					},
+					MockTagPolicy: func(ctx context.Context, input *awsiam.TagPolicyInput, opts []func(*awsiam.Options)) (*awsiam.TagPolicyOutput, error) {
+						tags := []awsiamtypes.Tag{
+							{Key: aws.String("k1"), Value: aws.String("v2")},
+							{Key: aws.String("k2"), Value: aws.String("v3")},
+						}
+						if diff := cmp.Diff(tags, input.Tags, cmpopts.SortSlices(func(a, b awsiamtypes.Tag) bool { return *a.Key < *b.Key })); diff != "" {
+							t.Errorf("r: -want, +got:\n%s", diff)
+						}
+						return &awsiam.TagPolicyOutput{}, nil
+					},
+				},
+				cr: policy(withExterName(arn), withTag("k1", "v2"), withTag("k2", "v3")),
+			},
+			want: want{
+				cr: policy(withExterName(arn), withTag("k1", "v2"), withTag("k2", "v3")),
+			},
+		},
+		/*
+			"InValidInputTODO": {
+				args: args{
+					cr: unexpectedItem,
+				},
+				want: want{
+					cr:  unexpectedItem,
+					err: errors.New(errUnexpectedObject),
+				},
+			},
+			"ListVersionsError": {
+				args: args{
+					iam: &fake.MockPolicyClient{
+						MockListPolicyVersions: func(ctx context.Context, input *awsiam.ListPolicyVersionsInput, opts []func(*awsiam.Options)) (*awsiam.ListPolicyVersionsOutput, error) {
+							return nil, errBoom
+						},
+					},
+					cr: policy(withExterName(arn)),
+				},
+				want: want{
+					cr:  policy(withExterName(arn)),
+					err: awsclient.Wrap(errBoom, errUpdate),
+				},
+			},
+			"CreateVersionError": {
+				args: args{
+					iam: &fake.MockPolicyClient{
+						MockListPolicyVersions: func(ctx context.Context, input *awsiam.ListPolicyVersionsInput, opts []func(*awsiam.Options)) (*awsiam.ListPolicyVersionsOutput, error) {
+							return &awsiam.ListPolicyVersionsOutput{}, nil
+						},
+						MockDeletePolicyVersion: func(ctx context.Context, input *awsiam.DeletePolicyVersionInput, opts []func(*awsiam.Options)) (*awsiam.DeletePolicyVersionOutput, error) {
+							return &awsiam.DeletePolicyVersionOutput{}, nil
+						},
+						MockCreatePolicyVersion: func(ctx context.Context, input *awsiam.CreatePolicyVersionInput, opts []func(*awsiam.Options)) (*awsiam.CreatePolicyVersionOutput, error) {
+							return nil, errBoom
+						},
+					},
+					cr: policy(withExterName(arn)),
+				},
+				want: want{
+					cr:  policy(withExterName(arn)),
+					err: awsclient.Wrap(errBoom, errUpdate),
+				},
+			},
+		*/
 	}
 
 	for name, tc := range cases {
