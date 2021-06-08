@@ -18,14 +18,12 @@ package v1alpha3
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reference"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/provider-aws/apis/identity/v1alpha1"
-	identityv1beta1 "github.com/crossplane/provider-aws/apis/identity/v1beta1"
+	ecrv1alpha1 "github.com/crossplane/provider-aws/apis/ecr/v1alpha1"
 	"github.com/crossplane/provider-aws/apis/s3/v1beta1"
 )
 
@@ -50,11 +48,11 @@ func (mg *BucketPolicy) ResolveReferences(ctx context.Context, c client.Reader) 
 	if mg.Spec.Parameters.Policy != nil && mg.Spec.Parameters.Policy.Statements != nil {
 		for i := range mg.Spec.Parameters.Policy.Statements {
 			statement := mg.Spec.Parameters.Policy.Statements[i]
-			err = ResolvePrincipal(ctx, r, statement.Principal, i)
+			err = ecrv1alpha1.ResolvePrincipal(ctx, r, statement.Principal, i)
 			if err != nil {
 				return err
 			}
-			err = ResolvePrincipal(ctx, r, statement.NotPrincipal, i)
+			err = ecrv1alpha1.ResolvePrincipal(ctx, r, statement.NotPrincipal, i)
 			if err != nil {
 				return err
 			}
@@ -64,6 +62,7 @@ func (mg *BucketPolicy) ResolveReferences(ctx context.Context, c client.Reader) 
 	return nil
 }
 
+/*
 // ResolvePrincipal resolves all the IAMUser and IAMRole references in a BucketPrincipal
 func ResolvePrincipal(ctx context.Context, r *reference.APIResolver, principal *BucketPrincipal, statementIndex int) error {
 	if principal == nil {
@@ -102,3 +101,4 @@ func ResolvePrincipal(ctx context.Context, r *reference.APIResolver, principal *
 	}
 	return nil
 }
+*/

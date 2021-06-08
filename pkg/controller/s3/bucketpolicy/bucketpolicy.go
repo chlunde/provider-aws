@@ -38,6 +38,7 @@ import (
 
 	"github.com/crossplane/provider-aws/apis/s3/v1alpha3"
 	awsclient "github.com/crossplane/provider-aws/pkg/clients"
+	"github.com/crossplane/provider-aws/pkg/clients/ecr"
 	"github.com/crossplane/provider-aws/pkg/clients/s3"
 )
 
@@ -133,7 +134,7 @@ func (e *external) formatBucketPolicy(original *v1alpha3.BucketPolicy) (*string,
 		return original.Spec.Parameters.RawPolicy, nil
 	case original.Spec.Parameters.Policy != nil:
 		c := original.DeepCopy()
-		body, err := s3.Serialize(c.Spec.Parameters.Policy)
+		body, err := ecr.Serialize(c.Spec.Parameters.Policy)
 		if err != nil {
 			return nil, err
 		}

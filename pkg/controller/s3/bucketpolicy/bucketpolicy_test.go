@@ -32,6 +32,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 
+	"github.com/crossplane/provider-aws/apis/ecr/v1alpha1"
 	"github.com/crossplane/provider-aws/apis/s3/v1alpha3"
 	awsclient "github.com/crossplane/provider-aws/pkg/clients"
 	"github.com/crossplane/provider-aws/pkg/clients/s3"
@@ -45,13 +46,13 @@ var (
 	policy         = `{"Statement":[{"Action":"s3:ListBucket","Effect":"Allow","Principal":"*","Resource":"arn:aws:s3:::test.s3.crossplane.com"}],"Version":"2012-10-17"}`
 
 	params = v1alpha3.BucketPolicyParameters{
-		Policy: &v1alpha3.BucketPolicyBody{
+		Policy: &v1alpha1.RepositoryPolicyBody{
 			Version: "2012-10-17",
-			Statements: []v1alpha3.BucketPolicyStatement{
+			Statements: []v1alpha1.RepositoryPolicyStatement{
 				{
 					Effect: "Allow",
-					Principal: &v1alpha3.BucketPrincipal{
-						AllowAnon: true,
+					Principal: &v1alpha1.RepositoryPrincipal{
+						AllowAnon: aws.Bool(true),
 					},
 					Action:   []string{"s3:ListBucket"},
 					Resource: []string{"arn:aws:s3:::test.s3.crossplane.com"},
@@ -82,8 +83,8 @@ func bucketPolicy(m ...bucketPolicyModifier) *v1alpha3.BucketPolicy {
 		Spec: v1alpha3.BucketPolicySpec{
 			Parameters: v1alpha3.BucketPolicyParameters{
 				BucketName: &bucketName,
-				Policy: &v1alpha3.BucketPolicyBody{
-					Statements: make([]v1alpha3.BucketPolicyStatement, 0),
+				Policy: &v1alpha1.RepositoryPolicyBody{
+					Statements: make([]v1alpha1.RepositoryPolicyStatement, 0),
 				},
 			},
 		},

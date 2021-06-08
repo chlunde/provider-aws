@@ -23,8 +23,9 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/crossplane/provider-aws/apis/s3/v1alpha3"
+	"github.com/crossplane/provider-aws/apis/ecr/v1alpha1"
 	aws "github.com/crossplane/provider-aws/pkg/clients"
+	"github.com/crossplane/provider-aws/pkg/clients/ecr"
 )
 
 var (
@@ -33,34 +34,34 @@ var (
 	statementID = aws.String("1")
 )
 
-type statementModifier func(statement *v1alpha3.BucketPolicyStatement)
+type statementModifier func(statement *v1alpha1.RepositoryPolicyStatement)
 
-func withPrincipal(s *v1alpha3.BucketPrincipal) statementModifier {
-	return func(statement *v1alpha3.BucketPolicyStatement) {
+func withPrincipal(s *v1alpha1.RepositoryPrincipal) statementModifier {
+	return func(statement *v1alpha1.RepositoryPolicyStatement) {
 		statement.Principal = s
 	}
 }
 
 func withPolicyAction(s []string) statementModifier {
-	return func(statement *v1alpha3.BucketPolicyStatement) {
+	return func(statement *v1alpha1.RepositoryPolicyStatement) {
 		statement.Action = s
 	}
 }
 
 func withResourcePath(s []string) statementModifier {
-	return func(statement *v1alpha3.BucketPolicyStatement) {
+	return func(statement *v1alpha1.RepositoryPolicyStatement) {
 		statement.Resource = s
 	}
 }
 
-func withConditionBlock(m []v1alpha3.Condition) statementModifier {
-	return func(statement *v1alpha3.BucketPolicyStatement) {
+func withConditionBlock(m []v1alpha1.Condition) statementModifier {
+	return func(statement *v1alpha1.RepositoryPolicyStatement) {
 		statement.Condition = m
 	}
 }
 
-func policyStatement(m ...statementModifier) *v1alpha3.BucketPolicyStatement {
-	cr := &v1alpha3.BucketPolicyStatement{
+func policyStatement(m ...statementModifier) *v1alpha1.RepositoryPolicyStatement {
+	cr := &v1alpha1.RepositoryPolicyStatement{
 		SID:    statementID,
 		Effect: effect,
 	}
@@ -72,7 +73,7 @@ func policyStatement(m ...statementModifier) *v1alpha3.BucketPolicyStatement {
 
 func TestSerializeBucketPolicyStatement(t *testing.T) {
 	cases := map[string]struct {
-		in  v1alpha3.BucketPolicyStatement
+		in  v1alpha1.RepositoryPolicyStatement
 		out string
 		err error
 	}{
@@ -82,8 +83,8 @@ func TestSerializeBucketPolicyStatement(t *testing.T) {
 		},
 		"ValidInput": {
 			in: *policyStatement(
-				withPrincipal(&v1alpha3.BucketPrincipal{
-					AllowAnon: true,
+				withPrincipal(&v1alpha1.RepositoryPrincipal{
+					AllowAnon: aws.Bool(true),
 				}),
 				withPolicyAction([]string{"s3:ListBucket"}),
 				withResourcePath([]string{"arn:aws:s3:::test.s3.crossplane.com"}),
@@ -92,8 +93,8 @@ func TestSerializeBucketPolicyStatement(t *testing.T) {
 		},
 		"ComplexInput": {
 			in: *policyStatement(
-				withPrincipal(&v1alpha3.BucketPrincipal{
-					AWSPrincipals: []v1alpha3.AWSPrincipal{
+				withPrincipal(&v1alpha1.RepositoryPrincipal{
+					AWSPrincipals: []v1alpha1.AWSPrincipal{
 						{
 							IAMUserARN: aws.String("arn:aws:iam::111122223333:userARN"),
 						},
@@ -107,10 +108,10 @@ func TestSerializeBucketPolicyStatement(t *testing.T) {
 				}),
 				withPolicyAction([]string{"s3:ListBucket"}),
 				withResourcePath([]string{"arn:aws:s3:::test.s3.crossplane.com"}),
-				withConditionBlock([]v1alpha3.Condition{
+				withConditionBlock([]v1alpha1.Condition{
 					{
 						OperatorKey: "test",
-						Conditions: []v1alpha3.ConditionPair{
+						Conditions: []v1alpha1.ConditionPair{
 							{
 								ConditionKey:         "test",
 								ConditionStringValue: aws.String("testKey"),
@@ -129,7 +130,7 @@ func TestSerializeBucketPolicyStatement(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			js, err := SerializeBucketPolicyStatement(tc.in)
+			js, err := ecr.SerializeRepositoryPolicyStatement(tc.in)
 
 			if diff := cmp.Diff(tc.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("r: -want, +got:\n%s", diff)
