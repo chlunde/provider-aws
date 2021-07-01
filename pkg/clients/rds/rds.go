@@ -104,6 +104,7 @@ func GenerateCreateDBInstanceInput(name, password string, p *v1beta1.RDSInstance
 		LicenseModel:                       p.LicenseModel,
 		MasterUserPassword:                 awsclients.String(password),
 		MasterUsername:                     p.MasterUsername,
+		MaxAllocatedStorage:                awsclients.Int64Address(p.MaxAllocatedStorage),
 		MonitoringInterval:                 awsclients.Int64Address(p.MonitoringInterval),
 		MonitoringRoleArn:                  p.MonitoringRoleARN,
 		MultiAZ:                            p.MultiAZ,
@@ -188,6 +189,7 @@ func GenerateModifyDBInstanceInput(name string, p *v1beta1.RDSInstanceParameters
 		EngineVersion:                      p.EngineVersion,
 		Iops:                               awsclients.Int64Address(p.IOPS),
 		LicenseModel:                       p.LicenseModel,
+		MaxAllocatedStorage:                awsclients.Int64Address(p.MaxAllocatedStorage),
 		MonitoringInterval:                 awsclients.Int64Address(p.MonitoringInterval),
 		MonitoringRoleArn:                  p.MonitoringRoleARN,
 		MultiAZ:                            p.MultiAZ,
@@ -224,6 +226,7 @@ func GenerateModifyDBInstanceInput(name string, p *v1beta1.RDSInstanceParameters
 // rds.DBInstance.
 func GenerateObservation(db rds.DBInstance) v1beta1.RDSInstanceObservation { // nolint:gocyclo
 	o := v1beta1.RDSInstanceObservation{
+		AllocatedStorage:                      int(aws.Int64Value(db.AllocatedStorage)),
 		DBInstanceStatus:                      aws.StringValue(db.DBInstanceStatus),
 		DBInstanceArn:                         aws.StringValue(db.DBInstanceArn),
 		DBInstancePort:                        int(aws.Int64Value(db.DbInstancePort)),

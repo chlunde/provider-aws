@@ -445,6 +445,16 @@ type RDSInstanceParameters struct {
 	// +immutable
 	MasterPasswordSecretRef *xpv1.SecretKeySelector `json:"masterPasswordSecretRef,omitempty"`
 
+	// The upper limit to which Amazon RDS can automatically scale the storage of
+	// the DB instance.
+	//
+	// For more information about this setting, including limitations that apply
+	// to it, see Managing capacity automatically with Amazon RDS storage autoscaling
+	// (https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIOPS.StorageTypes.html#USER_PIOPS.Autoscaling)
+	// in the Amazon RDS User Guide.
+	// +optional
+	MaxAllocatedStorage *int `json:"maxAllocatedStorage,omitempty"`
+
 	// MonitoringInterval is the interval, in seconds, between points when Enhanced Monitoring metrics
 	// are collected for the DB instance. To disable collecting Enhanced Monitoring
 	// metrics, specify 0. The default is 0.
@@ -1022,6 +1032,9 @@ type RDSInstanceObservation struct {
 	// is found in AWS CloudTrail log entries whenever the AWS KMS key for the DB
 	// instance is accessed.
 	DBResourceID string `json:"dbResourceId,omitempty"`
+
+	// AllocatedStorage is the allocated storage size in gibibytes.
+	AllocatedStorage int `json:"allocatedStorage,omitempty"`
 
 	// DomainMemberships is the Active Directory Domain membership records associated with the DB instance.
 	DomainMemberships []DomainMembership `json:"domainMemberships,omitempty"`
